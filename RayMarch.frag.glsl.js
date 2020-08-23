@@ -19,7 +19,7 @@ const vec3 SphereColour = vec3(0.5,0.5,1.0);
 #define FAR_Z		100.0
 
 //uniform vec4 MoonSphere;// = vec4(0,0,-3,1.0);
-const vec4 MoonSphere = vec4(0,0,-3,1.0);
+const vec4 MoonSphere = vec4(0,0,-1,0.4);
 
 struct TRay
 {
@@ -104,16 +104,16 @@ float DistanceToMoon(vec3 Position)
 	float MoonRadius = MoonSphere.w;
 	vec3 MoonSurfacePoint = MoonSphere.xyz + Normal * MoonRadius;
 	
-	float Height;
-	GetMoonHeightLocal( Normal, Height );
+	//float Height;
+	//GetMoonHeightLocal( Normal, Height );
 	
-	MoonSurfacePoint += Normal * Height * MoonSphere.w;
+	//MoonSurfacePoint += Normal * Height * MoonSphere.w;
 	
 	float Distance = length( Position - MoonSurfacePoint );
 	
 	//	do something more clever, like check against surface heights where the height could get in our way
 	//	this scalar (where it works) is relative to the height, so maybe we can work that out...
-	Distance *= HeightMapStepBack;
+	//Distance *= HeightMapStepBack;
 	
 	return Distance;
 }
@@ -185,6 +185,8 @@ void main()
 {
 	TRay Ray;
 	GetWorldRay(Ray.Pos,Ray.Dir);
+	gl_FragColor = vec4(Ray.Dir,1.0);
+	
 	vec4 Colour = vec4(BackgroundColour,0.0);
 	
 	float StepHeat;
@@ -198,9 +200,9 @@ void main()
 		SphereColour.xyz *= Mult;
 	}
 	
-	
 	Colour = mix( Colour, SphereColour, max(0.0,SphereColour.w) );
 	gl_FragColor = Colour;
+	gl_FragColor.w = 1.0;
 }
 
 

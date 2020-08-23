@@ -26,6 +26,40 @@ Pop.Yield = function(Milliseconds)
 }
 
 
+Math.MatrixInverse4x4 = function(Matrix)
+{
+	let m = Matrix;
+	let r = [];
+	
+	r[0] = m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[6]*m[9]*m[15] + m[6]*m[13]*m[11] + m[7]*m[9]*m[14] - m[7]*m[13]*m[10];
+	r[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[2]*m[9]*m[15] - m[2]*m[13]*m[11] - m[3]*m[9]*m[14] + m[3]*m[13]*m[10];
+	r[2] = m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[2]*m[5]*m[15] + m[2]*m[13]*m[7] + m[3]*m[5]*m[14] - m[3]*m[13]*m[6];
+	r[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[2]*m[5]*m[11] - m[2]*m[9]*m[7] - m[3]*m[5]*m[10] + m[3]*m[9]*m[6];
+	
+	r[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[6]*m[8]*m[15] - m[6]*m[12]*m[11] - m[7]*m[8]*m[14] + m[7]*m[12]*m[10];
+	r[5] = m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[2]*m[8]*m[15] + m[2]*m[12]*m[11] + m[3]*m[8]*m[14] - m[3]*m[12]*m[10];
+	r[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[2]*m[4]*m[15] - m[2]*m[12]*m[7] - m[3]*m[4]*m[14] + m[3]*m[12]*m[6];
+	r[7] = m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[2]*m[4]*m[11] + m[2]*m[8]*m[7] + m[3]*m[4]*m[10] - m[3]*m[8]*m[6];
+	
+	r[8] = m[4]*m[9]*m[15] - m[4]*m[13]*m[11] - m[5]*m[8]*m[15] + m[5]*m[12]*m[11] + m[7]*m[8]*m[13] - m[7]*m[12]*m[9];
+	r[9] = -m[0]*m[9]*m[15] + m[0]*m[13]*m[11] + m[1]*m[8]*m[15] - m[1]*m[12]*m[11] - m[3]*m[8]*m[13] + m[3]*m[12]*m[9];
+	r[10] = m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[1]*m[4]*m[15] + m[1]*m[12]*m[7] + m[3]*m[4]*m[13] - m[3]*m[12]*m[5];
+	r[11] = -m[0]*m[5]*m[11] + m[0]*m[9]*m[7] + m[1]*m[4]*m[11] - m[1]*m[8]*m[7] - m[3]*m[4]*m[9] + m[3]*m[8]*m[5];
+	
+	r[12] = -m[4]*m[9]*m[14] + m[4]*m[13]*m[10] + m[5]*m[8]*m[14] - m[5]*m[12]*m[10] - m[6]*m[8]*m[13] + m[6]*m[12]*m[9];
+	r[13] = m[0]*m[9]*m[14] - m[0]*m[13]*m[10] - m[1]*m[8]*m[14] + m[1]*m[12]*m[10] + m[2]*m[8]*m[13] - m[2]*m[12]*m[9];
+	r[14] = -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[1]*m[4]*m[14] - m[1]*m[12]*m[6] - m[2]*m[4]*m[13] + m[2]*m[12]*m[5];
+	r[15] = m[0]*m[5]*m[10] - m[0]*m[9]*m[6] - m[1]*m[4]*m[10] + m[1]*m[8]*m[6] + m[2]*m[4]*m[9] - m[2]*m[8]*m[5];
+	
+	let det = m[0]*r[0] + m[1]*r[4] + m[2]*r[8] + m[3]*r[12];
+	for ( let i=0;	i<16;	i++ )
+		r[i] /= det;
+	
+	return r;
+	
+}
+
+
 class GeoQuad_t
 {
 	constructor(gl)
@@ -64,12 +98,13 @@ class GeoQuad_t
 
 class Shader_t
 {
-	constructor(RenderContext,VertSource,FragSource)
+	constructor(gl,VertSource,FragSource)
 	{
-		const gl = RenderContext;
-		this.UniformCache = {};
-		const FragShader = this.CompileShader( RenderContext, gl.FRAGMENT_SHADER, FragSource, 'Frag' );
-		const VertShader = this.CompileShader( RenderContext, gl.VERTEX_SHADER, VertSource, 'Vert' );
+		//	gr: all this cache, program etc are dependent on this gl context instance, so we can just keep it
+		this.gl = gl;
+		this.UniformMetaCache = null;
+		const FragShader = this.CompileShader( gl.FRAGMENT_SHADER, FragSource, 'Frag' );
+		const VertShader = this.CompileShader( gl.VERTEX_SHADER, VertSource, 'Vert' );
 		this.Program = gl.createProgram();
 		gl.attachShader( this.Program, VertShader );
 		gl.attachShader( this.Program, FragShader );
@@ -84,8 +119,9 @@ class Shader_t
 		}
 	}
 	
-	CompileShader(gl,Type,Source,TypeName)
+	CompileShader(Type,Source,TypeName)
 	{
+		const gl = this.gl;
 		const Shader = gl.createShader(Type);
 		gl.shaderSource( Shader, Source );
 		gl.compileShader( Shader );
@@ -96,6 +132,167 @@ class Shader_t
 			throw `Failed to compile ${TypeName}: ${Error}`;
 		}
 		return Shader;
+	}
+	
+	GetUniformMeta(Name)
+	{
+		const Metas = this.GetUniformMetas();
+		return Metas[Name];
+	}
+	
+	GetUniformMetas()
+	{
+		if ( this.UniformMetaCache )
+			return this.UniformMetaCache;
+
+		const gl = this.gl;
+		//	iterate and cache!
+		this.UniformMetaCache = {};
+		let UniformCount = gl.getProgramParameter( this.Program, gl.ACTIVE_UNIFORMS );
+		for ( let i=0;	i<UniformCount;	i++ )
+		{
+			let UniformMeta = gl.getActiveUniform( this.Program, i );
+			UniformMeta.ElementCount = UniformMeta.size;
+			UniformMeta.ElementSize = undefined;
+			//	match name even if it's an array
+			//	todo: struct support
+			let UniformName = UniformMeta.name.split('[')[0];
+			//	note: uniform consists of structs, Array[Length] etc
+			
+			UniformMeta.Location = gl.getUniformLocation( this.Program, UniformMeta.name );
+			switch( UniformMeta.type )
+			{
+				case gl.SAMPLER_2D:	//	samplers' value is the texture index
+				case gl.INT:
+				case gl.UNSIGNED_INT:
+				case gl.BOOL:
+					UniformMeta.ElementSize = 1;
+					UniformMeta.SetValues = function(v)	{	gl.uniform1iv( UniformMeta.Location, v );	};
+					break;
+				case gl.FLOAT:
+					UniformMeta.ElementSize = 1;
+					UniformMeta.SetValues = function(v)	{	gl.uniform1fv( UniformMeta.Location, v );	};
+					break;
+				case gl.FLOAT_VEC2:
+					UniformMeta.ElementSize = 2;
+					UniformMeta.SetValues = function(v)	{	gl.uniform2fv( UniformMeta.Location, v );	};
+					break;
+				case gl.FLOAT_VEC3:
+					UniformMeta.ElementSize = 3;
+					UniformMeta.SetValues = function(v)	{	gl.uniform3fv( UniformMeta.Location, v );	};
+					break;
+				case gl.FLOAT_VEC4:
+					UniformMeta.ElementSize = 4;
+					UniformMeta.SetValues = function(v)	{	gl.uniform4fv( UniformMeta.Location, v );	};
+					break;
+				case gl.FLOAT_MAT2:
+					UniformMeta.ElementSize = 2*2;
+					UniformMeta.SetValues = function(v)	{	const Transpose = false;	gl.uniformMatrix2fv( UniformMeta.Location, Transpose, v );	};
+					break;
+				case gl.FLOAT_MAT3:
+					UniformMeta.ElementSize = 3*3;
+					UniformMeta.SetValues = function(v)	{	const Transpose = false;	gl.uniformMatrix3fv( UniformMeta.Location, Transpose, v );	};
+					break;
+				case gl.FLOAT_MAT4:
+					UniformMeta.ElementSize = 4*4;
+					UniformMeta.SetValues = function(v)	{	const Transpose = false;	gl.uniformMatrix4fv( UniformMeta.Location, Transpose, v );	};
+					break;
+					
+				default:
+					UniformMeta.SetValues = function(v)	{	throw "Unhandled type " + UniformMeta.type + " on " + UniformName;	};
+					break;
+			}
+			
+			this.UniformMetaCache[UniformName] = UniformMeta;
+		}
+		return this.UniformMetaCache;
+	}
+	
+	//	gr: can't tell the difference between int and float, so err that wont work
+	SetUniform(Uniform,Value)
+	{
+		const UniformMeta = this.GetUniformMeta(Uniform);
+		if ( !UniformMeta )
+			return;
+		if( Array.isArray(Value) )					this.SetUniformArray( Uniform, UniformMeta, Value );
+		else if( Value instanceof Float32Array )	this.SetUniformArray( Uniform, UniformMeta, Value );
+		//else if ( Value instanceof Pop.Image )		this.SetUniformTexture( Uniform, UniformMeta, Value, this.Context.AllocTexureIndex() );
+		else if ( typeof Value === 'number' )		this.SetUniformNumber( Uniform, UniformMeta, Value );
+		else if ( typeof Value === 'boolean' )		this.SetUniformNumber( Uniform, UniformMeta, Value );
+		else
+		{
+			console.log(typeof Value);
+			console.log(Value);
+			throw "Failed to set uniform " +Uniform + " to " + ( typeof Value );
+		}
+	}
+	
+	SetUniformArray(UniformName,UniformMeta,Values)
+	{
+		const ExpectedValueCount = UniformMeta.ElementSize * UniformMeta.ElementCount;
+		
+		//	all aligned
+		if ( Values.length == ExpectedValueCount )
+		{
+			UniformMeta.SetValues( Values );
+			return;
+		}
+		
+		//Pop.Debug("SetUniformArray("+UniformName+") slow path");
+		
+		//	note: uniform iv may need to be Int32Array;
+		//	https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/uniform
+		//	enumerate the array
+		let ValuesExpanded = [];
+		let EnumValue = function(v)
+		{
+			if ( Array.isArray(v) )
+				ValuesExpanded.push(...v);
+			else if ( typeof v == "object" )
+				v.Enum( function(v)	{	ValuesExpanded.push(v);	} );
+			else
+				ValuesExpanded.push(v);
+		};
+		Values.forEach( EnumValue );
+		
+		//	check array size (allow less, but throw on overflow)
+		//	error if array is empty
+		while ( ValuesExpanded.length < ExpectedValueCount )
+			ValuesExpanded.push(0);
+		/*
+		 if ( ValuesExpanded.length > UniformMeta.size )
+		 throw "Trying to put array of " + ValuesExpanded.length + " values into uniform " + UniformName + "[" + UniformMeta.size + "] ";
+		 */
+		UniformMeta.SetValues( ValuesExpanded );
+	}
+	/*
+	SetUniformTexture(Uniform,UniformMeta,Image,TextureIndex)
+	{
+		const Texture = Image.GetOpenglTexture( this.Context );
+		const gl = this.GetGlContext();
+		//  https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
+		//  WebGL provides a minimum of 8 texture units;
+		const GlTextureNames = [ gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3, gl.TEXTURE4, gl.TEXTURE5, gl.TEXTURE6, gl.TEXTURE7 ];
+		//	setup textures
+		gl.activeTexture( GlTextureNames[TextureIndex] );
+		try
+		{
+			gl.bindTexture(gl.TEXTURE_2D, Texture );
+		}
+		catch(e)
+		{
+			Pop.Debug("SetUniformTexture: " + e);
+			//  todo: bind an "invalid" texture
+		}
+		UniformMeta.SetValues( [TextureIndex] );
+	}
+	*/
+	SetUniformNumber(Uniform,UniformMeta,Value)
+	{
+		//	these are hard to track down and pretty rare anyone would want a nan
+		if ( isNaN(Value) )
+			throw "Setting NaN on Uniform " + Uniform.Name;
+		UniformMeta.SetValues( [Value] );
 	}
 }
 
@@ -181,6 +378,9 @@ class RenderTarget_t
 		Shader = GetAsset(Shader,gl);
 		gl.useProgram( Shader.Program );
 		Geo.Bind( gl, Shader.Program );
+		
+		Object.entries(Uniforms).forEach(kv => Shader.SetUniform(...kv) );
+		
 		gl.drawArrays( Geo.PrimitiveType, 0, Geo.IndexCount );
 		
 		/*
@@ -218,6 +418,12 @@ class RenderTarget_t
 const Params = {}
 Params.ClearColour = [0.4,0.5,0];
 Params.Time = 0;
+Params.BackgroundColour = [0,0,0];
+Params.ApplyAmbientOcclusionColour = true;
+Params.ApplyHeightColour = false;
+Params.AmbientOcclusionMin = 0.21;
+Params.AmbientOcclusionMax = 0.66;
+
 
 //	we don't use the browser anim loop as it stops in webxr mode
 //	so we get update from render
@@ -237,12 +443,14 @@ function Render(RenderTarget,Camera)
 	//	render geo
 	RenderTarget.Clear(...Params.ClearColour);
 
-	const Uniforms = Object.assign({},Camera);
-	
-	Uniforms.ScreenToCameraTransform = Camera.ProjectionMatrix;
+	let Uniforms = {};
+	Uniforms = Object.assign(Uniforms,Camera);
+	Uniforms = Object.assign(Uniforms,Params);
+
+	//Uniforms.ScreenToCameraTransform = Camera.ProjectionMatrix;
 	Uniforms.CameraToWorldTransform = Camera.LocalToWorld;
 	
-	RenderTarget.Draw('Quad','Debug',Uniforms);
+	//RenderTarget.Draw('Quad','Debug',Uniforms);
 	RenderTarget.Draw('Quad','RaySphere',Uniforms);
 }
 
@@ -345,10 +553,11 @@ class Pop_Xr_Device
 			
 			//	write position (w should always be 0
 			Camera.Position = [View.transform.position.x,View.transform.position.y,View.transform.position.z];
-			Camera.LocalToWorld = View.transform.inverse.matrix;
-			Camera.WorldToLocal = View.transform.matrix;
-			//	LocalToView
+			Camera.LocalToWorld = View.transform.matrix;
+			Camera.WorldToLocal = View.transform.inverse.matrix;
 			Camera.ProjectionMatrix = View.projectionMatrix;
+			Camera.ScreenToCameraTransform = Math.MatrixInverse4x4(View.projectionMatrix);
+			Camera.CameraToScreenTransform = View.projectionMatrix;
 			
 			BindRenderTarget();
 			this.OnRender( RenderTarget, Camera );
@@ -419,12 +628,27 @@ class ScreenDevice_t
 	
 	OnRenderCallback(RenderContext)
 	{
+		function BindRenderTarget()
+		{
+			const gl = RenderContext;
+			const FrameBuffer = null;
+			
+			//	this w/h should be canvas's w/h and that should be in sync with the element's getBoundingClientRect
+			//	in pixels!
+			const Viewport = [0,0,100,100];
+			
+			gl.bindFramebuffer( gl.FRAMEBUFFER, FrameBuffer );
+			gl.viewport( ...Viewport );
+			gl.scissor( ...Viewport );
+		}
+		
 		this.Camera.Position = [0,0,0];
 		this.Camera.LocalToWorld = GetMatrixIdentity();
 		this.Camera.WorldToLocal = GetMatrixIdentity();
 		this.Camera.ProjectionMatrix = GetMatrixIdentity();
 
 		let RenderTarget = new RenderTarget_t(RenderContext);
+		BindRenderTarget();
 		this.OnRender( RenderTarget, this.Camera );
 	}
 }
@@ -446,8 +670,8 @@ export default async function Main(Canvas,StartButton)
 	
 	const RenderContext = await CreateRenderContext(Canvas);
 	
-	//const ScreenDevice = new ScreenDevice_t(RenderContext);
-	//ScreenDevice.OnRender = Render;
+	const ScreenDevice = new ScreenDevice_t(RenderContext);
+	ScreenDevice.OnRender = Render;
 	
 	while(true)
 	{
