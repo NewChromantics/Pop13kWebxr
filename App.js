@@ -430,10 +430,10 @@ function GetSceneSphereData()
 	function PushSphere(x,y,z,Radius,r,g,b)
 	{
 		//	needs to be 8, better way to enforce/pad this?
-		SphereData.push(...arguments);
+		SphereData.push(...arguments,99);
 	}
 	
-	PushSphere(...MoonSphere,1,MoonRadius,...Params.MoonColour);
+	PushSphere(...MoonSphere,MoonRadius,...Params.MoonColour);
 	Object.values(LastInputs).forEach( Position => PushSphere(...Position,Params.InputRadius,...Params.InputColour) );
 	return SphereData;
 }
@@ -535,7 +535,7 @@ class Pop_Xr_Device
 		{
 			let Pose = Frame.getPose(Space,ReferenceSpace);
 			Pose = Pose ? Pose.transform.position : {};
-			return [Pose.x,Pose.y,Pose.z,1];
+			return [Pose.x,Pose.y,Pose.z];
 		}
 		
 		function UpdateInputNode(InputXrSpace,InputName,Buttons)
