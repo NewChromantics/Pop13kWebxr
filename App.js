@@ -28,35 +28,38 @@ Pop.Yield = function(Milliseconds)
 
 Math.MatrixInverse4x4 = function(Matrix)
 {
-	let m = Matrix;
-	let r = [];
+	//	3x3 inversion from
+	//	https://codegolf.stackexchange.com/questions/168828/find-the-inverse-of-a-3-by-3-matrix
+	//(a,b,c,d,e,f,g,h,i)=>[x=e*i-h*f,c*h-b*i,b*f-c*e,y=f*g-d*i,a*i-c*g,d*c-a*f,z=d*h-g*e,g*b-a*h,a*e-d*b].map(v=>v/=a*x+b*y+c*z)
 	
-	r[0] = m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[6]*m[9]*m[15] + m[6]*m[13]*m[11] + m[7]*m[9]*m[14] - m[7]*m[13]*m[10];
-	r[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[2]*m[9]*m[15] - m[2]*m[13]*m[11] - m[3]*m[9]*m[14] + m[3]*m[13]*m[10];
-	r[2] = m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[2]*m[5]*m[15] + m[2]*m[13]*m[7] + m[3]*m[5]*m[14] - m[3]*m[13]*m[6];
-	r[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[2]*m[5]*m[11] - m[2]*m[9]*m[7] - m[3]*m[5]*m[10] + m[3]*m[9]*m[6];
+	//	gr: my attempt at reducing in a similar way
+	let [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p] = Matrix;
+	let r =
+	[
+		f*k*p - f*o*l - g*j*p + g*n*l + h*j*o - h*n*k,
+		-b*k*p + b*o*l + c*j*p - c*n*l - d*j*o + d*n*k,
+		b*g*p - b*o*h - c*f*p + c*n*h + d*f*o - d*n*g,
+		-b*g*l + b*k*h + c*f*l - c*j*h - d*f*k + d*j*g,
 	
-	r[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[6]*m[8]*m[15] - m[6]*m[12]*m[11] - m[7]*m[8]*m[14] + m[7]*m[12]*m[10];
-	r[5] = m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[2]*m[8]*m[15] + m[2]*m[12]*m[11] + m[3]*m[8]*m[14] - m[3]*m[12]*m[10];
-	r[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[2]*m[4]*m[15] - m[2]*m[12]*m[7] - m[3]*m[4]*m[14] + m[3]*m[12]*m[6];
-	r[7] = m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[2]*m[4]*m[11] + m[2]*m[8]*m[7] + m[3]*m[4]*m[10] - m[3]*m[8]*m[6];
+		-e*k*p + e*o*l + g*i*p - g*m*l - h*i*o + h*m*k,
+		a*k*p - a*o*l - c*i*p + c*m*l + d*i*o - d*m*k,
+		-a*g*p + a*o*h + c*e*p - c*m*h - d*e*o + d*m*g,
+		a*g*l - a*k*h - c*e*l + c*i*h + d*e*k - d*i*g,
 	
-	r[8] = m[4]*m[9]*m[15] - m[4]*m[13]*m[11] - m[5]*m[8]*m[15] + m[5]*m[12]*m[11] + m[7]*m[8]*m[13] - m[7]*m[12]*m[9];
-	r[9] = -m[0]*m[9]*m[15] + m[0]*m[13]*m[11] + m[1]*m[8]*m[15] - m[1]*m[12]*m[11] - m[3]*m[8]*m[13] + m[3]*m[12]*m[9];
-	r[10] = m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[1]*m[4]*m[15] + m[1]*m[12]*m[7] + m[3]*m[4]*m[13] - m[3]*m[12]*m[5];
-	r[11] = -m[0]*m[5]*m[11] + m[0]*m[9]*m[7] + m[1]*m[4]*m[11] - m[1]*m[8]*m[7] - m[3]*m[4]*m[9] + m[3]*m[8]*m[5];
+		e*j*p - e*n*l - f*i*p + f*m*l + h*i*n - h*m*j,
+		-a*j*p + a*n*l + b*i*p - b*m*l - d*i*n + d*m*j,
+		a*f*p - a*n*h - b*e*p + b*m*h + d*e*n - d*m*f,
+		-a*f*l + a*j*h + b*e*l - b*i*h - d*e*j + d*i*f,
 	
-	r[12] = -m[4]*m[9]*m[14] + m[4]*m[13]*m[10] + m[5]*m[8]*m[14] - m[5]*m[12]*m[10] - m[6]*m[8]*m[13] + m[6]*m[12]*m[9];
-	r[13] = m[0]*m[9]*m[14] - m[0]*m[13]*m[10] - m[1]*m[8]*m[14] + m[1]*m[12]*m[10] + m[2]*m[8]*m[13] - m[2]*m[12]*m[9];
-	r[14] = -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[1]*m[4]*m[14] - m[1]*m[12]*m[6] - m[2]*m[4]*m[13] + m[2]*m[12]*m[5];
-	r[15] = m[0]*m[5]*m[10] - m[0]*m[9]*m[6] - m[1]*m[4]*m[10] + m[1]*m[8]*m[6] + m[2]*m[4]*m[9] - m[2]*m[8]*m[5];
+		-e*j*o + e*n*k + f*i*o - f*m*k - g*i*n + g*m*j,
+		a*j*o - a*n*k - b*i*o + b*m*k + c*i*n - c*m*j,
+		-a*f*o + a*n*g + b*e*o - b*m*g - c*e*n + c*m*f,
+		a*f*k - a*j*g - b*e*k + b*i*g + c*e*j - c*i*f,
+	 ];
 	
-	let det = m[0]*r[0] + m[1]*r[4] + m[2]*r[8] + m[3]*r[12];
-	for ( let i=0;	i<16;	i++ )
-		r[i] /= det;
-	
+	let det = a*r[0] + b*r[4] + c*r[8] + d*r[12];
+	r = r.map( v => v/det );
 	return r;
-	
 }
 
 
