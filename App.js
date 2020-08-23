@@ -79,7 +79,7 @@ class Shader_t
 		{
 			//	gr: list cases when no error "" occurs here;
 			//	- too many varyings > MAX_VARYING_VECTORS
-			const Error = gl.getProgramInfoLog(Program);
+			const Error = gl.getProgramInfoLog(this.Program);
 			throw `Failed to link shaders; ${Error}`;
 		}
 	}
@@ -111,11 +111,24 @@ void main()
 }
 `;
 
+
+const FragDebugUvShader = `
+precision highp float;
+varying vec2 LocalUv;
+void main()
+{
+	gl_FragColor = vec4(LocalUv,0,1);
+}
+`;
+
+import FragRaySphereShader from './RayMarch.frag.glsl.js';
+
 const AssetCaches = {};
 const AssetFetchs = {};
 
 AssetFetchs['Quad'] = GetQuad;
 AssetFetchs['Debug'] = GetDebugShader;
+AssetFetchs['RaySphere'] = GetRaySphereShader;
 
 function GetAsset(Name,Context)
 {
@@ -131,15 +144,12 @@ function GetQuad(RenderContext)
 
 function GetDebugShader(RenderContext)
 {
-	const FragShader = `
-	precision highp float;
-	varying vec2 LocalUv;
-	void main()
-	{
-		gl_FragColor = vec4(LocalUv,0,1);
-	}
-	`;
-	return new Shader_t(RenderContext,QuadVertShader,FragShader);
+	return new Shader_t(RenderContext,QuadVertShader,FragDebugUvShader);
+}
+
+function GetRaySphereShader(RenderContext)
+{
+	return new Shader_t(RenderContext,QuadVertShader,FragRaySphereShader);
 }
 
 class RenderTarget_t
@@ -228,7 +238,12 @@ function Render(RenderTarget,Camera)
 	RenderTarget.Clear(...Params.ClearColour);
 
 	const Uniforms = Object.assign({},Camera);
+	
+	Uniforms.ScreenToCameraTransform = Camera.ProjectionMatrix;
+	Uniforms.CameraToWorldTransform = Camera.LocalToWorld;
+	
 	RenderTarget.Draw('Quad','Debug',Uniforms);
+	RenderTarget.Draw('Quad','RaySphere',Uniforms);
 }
 
 async function CreateRenderContext(Canvas)
@@ -382,6 +397,11 @@ async function CreateWebxrDevice(RenderContext,OnWaitForCallback)
 }
 
 
+function GetMatrixIdentity()
+{
+	return [1,0,0,0,	0,1,0,0,	0,0,1,0,	0,0,0,1	];
+}
+
 class ScreenDevice_t
 {
 	constructor(RenderContext)
@@ -399,6 +419,11 @@ class ScreenDevice_t
 	
 	OnRenderCallback(RenderContext)
 	{
+		this.Camera.Position = [0,0,0];
+		this.Camera.LocalToWorld = GetMatrixIdentity();
+		this.Camera.WorldToLocal = GetMatrixIdentity();
+		this.Camera.ProjectionMatrix = GetMatrixIdentity();
+
 		let RenderTarget = new RenderTarget_t(RenderContext);
 		this.OnRender( RenderTarget, this.Camera );
 	}
@@ -420,6 +445,7 @@ export default async function Main(Canvas,StartButton)
 	}
 	
 	const RenderContext = await CreateRenderContext(Canvas);
+	
 	//const ScreenDevice = new ScreenDevice_t(RenderContext);
 	//ScreenDevice.OnRender = Render;
 	
