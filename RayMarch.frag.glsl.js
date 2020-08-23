@@ -12,14 +12,24 @@ uniform float AmbientOcclusionMin;
 uniform float AmbientOcclusionMax;
 uniform float HeightMapStepBack;
 uniform vec3 BackgroundColour;
-const bool FlipSample = true;
 const vec3 SphereColour = vec3(0.5,0.5,1.0);
 
-#define MAX_STEPS	40
-#define FAR_Z		100.0
+#define MAX_STEPS	10
+#define FAR_Z		40.0
 
-//uniform vec4 MoonSphere;// = vec4(0,0,-3,1.0);
-const vec4 MoonSphere = vec4(0,0,-1,0.4);
+#define MAX_SPHERES		10
+#define SPHERE_STRIDE	2
+uniform vec4 SphereData[MAX_SPHERES*SPHERE_STRIDE];
+
+//	gr: this won't inline/unroll even though it could
+#define GetSphere(Index,Pos,Valid,Radius,Rgb)	\
+{					\
+	Pos = SphereData[Index*SPHERE_STRIDE+0].xyz;	\
+	Valid = SphereData[Index*SPHERE_STRIDE+0].w > 0.0;	\
+	Radius = SphereData[Index*SPHERE_STRIDE+1].x;	\
+	Rgb = SphereData[Index*SPHERE_STRIDE+1].yzw;	\
+}
+
 
 struct TRay
 {
@@ -96,28 +106,7 @@ void GetMoonColourHeight(vec3 MoonNormal,out vec3 Colour,out float Height)
 
 
 
-
-float DistanceToMoon(vec3 Position)
-{
-	vec3 DeltaToSurface = MoonSphere.xyz - Position;
-	vec3 Normal = -normalize( DeltaToSurface );
-	float MoonRadius = MoonSphere.w;
-	vec3 MoonSurfacePoint = MoonSphere.xyz + Normal * MoonRadius;
-	
-	//float Height;
-	//GetMoonHeightLocal( Normal, Height );
-	
-	//MoonSurfacePoint += Normal * Height * MoonSphere.w;
-	
-	float Distance = length( Position - MoonSurfacePoint );
-	
-	//	do something more clever, like check against surface heights where the height could get in our way
-	//	this scalar (where it works) is relative to the height, so maybe we can work that out...
-	//Distance *= HeightMapStepBack;
-	
-	return Distance;
-}
-
+/*
 vec3 GetMoonColour(vec3 Position)
 {
 	//	duplicate code!
@@ -131,9 +120,31 @@ vec3 GetMoonColour(vec3 Position)
 	GetMoonColourHeight( Normal, Colour, Height );
 	return Colour;
 }
+*/
 
+float GetDistanceToSphere(vec3 RayPosition,vec3 SpherePosition,float Radius)
+{
+	vec3 DeltaToSurface = SpherePosition - RayPosition;
+	vec3 Normal = -normalize( DeltaToSurface );
+	vec3 MoonSurfacePoint = SpherePosition + Normal * Radius;
+	float Distance = length( RayPosition - MoonSurfacePoint );
+	return Distance;
+}
 
-
+float GetSceneDistance(vec3 RayPosition)
+{
+	float Distance = 999.0;
+	for ( int s=0;	s<MAX_SPHERES;	s++ )
+	{
+		vec3 SpherePos,SphereRgb;
+		float SphereRadius;
+		bool Valid;
+		GetSphere( s, SpherePos, Valid, SphereRadius, SphereRgb );
+		float SphereDistance = Valid ? GetDistanceToSphere(RayPosition,SpherePos,SphereRadius) : 999.0;
+		Distance = min( Distance, SphereDistance );
+	}
+	return Distance;
+}
 
 //	returns intersction pos, w=success
 vec4 RayMarchSpherePos(TRay Ray,out float StepHeat)
@@ -145,13 +156,13 @@ vec4 RayMarchSpherePos(TRay Ray,out float StepHeat)
 	const int MaxSteps = MAX_STEPS;
 	
 	//	start close
-	float RayTime = DistanceToMoon( Ray.Pos );//0.01;
+	float RayTime = GetSceneDistance( Ray.Pos );//0.01;
 	
 	for ( int s=0;	s<MaxSteps;	s++ )
 	{
 		StepHeat = float(s)/float(MaxSteps);
 		vec3 Position = Ray.Pos + Ray.Dir * RayTime;
-		float MoonDistance = DistanceToMoon( Position );
+		float MoonDistance = GetSceneDistance( Position );
 		float HitDistance = MoonDistance;
 		
 		//RayTime += max( HitDistance, MinStep );
@@ -175,7 +186,8 @@ vec4 RayMarchSphere(TRay Ray,out float StepHeat)
 	//if ( Intersection.w < 0.0 )
 	//	return vec4(1,0,0,0);
 	
-	vec3 Colour = GetMoonColour( Intersection.xyz );
+	//vec3 Colour = GetMoonColour( Intersection.xyz );
+	vec3 Colour = vec3(1,1,1);
 	return vec4( Colour, Intersection.w );
 }
 

@@ -26,7 +26,7 @@ Pop.Yield = function(Milliseconds)
 }
 
 
-Math.MatrixInverse4x4 = function(Matrix)
+function InvertMatrix4x4(Matrix)
 {
 	//	3x3 inversion from
 	//	https://codegolf.stackexchange.com/questions/168828/find-the-inverse-of-a-3-by-3-matrix
@@ -262,6 +262,8 @@ class Shader_t
 		//	error if array is empty
 		while ( ValuesExpanded.length < ExpectedValueCount )
 			ValuesExpanded.push(0);
+		//	gr: clip on overflow
+		ValuesExpanded.length = Math.min(ValuesExpanded.length,ExpectedValueCount);
 		/*
 		 if ( ValuesExpanded.length > UniformMeta.size )
 		 throw "Trying to put array of " + ValuesExpanded.length + " values into uniform " + UniformName + "[" + UniformMeta.size + "] ";
@@ -412,19 +414,42 @@ Params.ApplyAmbientOcclusionColour = true;
 Params.ApplyHeightColour = false;
 Params.AmbientOcclusionMin = 0.21;
 Params.AmbientOcclusionMax = 0.66;
+Params.MoonColour = [1,1,1];
+Params.InputRadius = 0.01;
+Params.InputColour = [1,0,0];
 
+let LastInputs = {};
+
+let MoonSphere = [0,1,-1];
+let MoonRadius = 0.10;
+
+//	get spheres to render
+function GetSceneSphereData()
+{
+	let SphereData = [];
+	function PushSphere(x,y,z,Radius,r,g,b)
+	{
+		//	needs to be 8, better way to enforce/pad this?
+		SphereData.push(...arguments);
+	}
+	
+	PushSphere(...MoonSphere,1,MoonRadius,...Params.MoonColour);
+	Object.values(LastInputs).forEach( Position => PushSphere(...Position,Params.InputRadius,...Params.InputColour) );
+	return SphereData;
+}
 
 //	we don't use the browser anim loop as it stops in webxr mode
 //	so we get update from render
-function Update(TimeStepMs=1000/60)
+function Update(Inputs,TimeStepMs=1000/60)
 {
+	//Object.assign(LastInputs,Inputs);
+	LastInputs = Inputs;
 	Params.Time += TimeStepMs;
 	Params.ClearColour[2] = (Params.Time/1000) % 1;
 }
 
 function Render(RenderTarget,Camera)
 {
-	Update();
 	//	bind rt
 	//	bind shader
 	//	bind uniforms
@@ -438,6 +463,8 @@ function Render(RenderTarget,Camera)
 
 	//Uniforms.ScreenToCameraTransform = Camera.ProjectionMatrix;
 	Uniforms.CameraToWorldTransform = Camera.LocalToWorld;
+	
+	Uniforms.SphereData = GetSceneSphereData();
 	
 	RenderTarget.Draw('Quad','RaySphere',Uniforms);
 }
@@ -462,22 +489,17 @@ class Pop_Xr_Device
 		this.ReferenceSpace = ReferenceSpace;
 		this.RenderContext = RenderContext;
 
-		this.WaitForExitPromise = Pop.CreatePromise();
+		this.WaitForExit = Pop.CreatePromise();
 		//	store input state so we can detect button up, tracking lost/regained
 		this.InputStates = {};	//	[Name] = XrInputState
 		
 		//	catch exit
-		Session.addEventListener('end', this.WaitForExitPromise.Resolve );
+		Session.addEventListener('end', this.WaitForExit.Resolve );
 		
 		this.InitLayer();
 		
 		//	start loop
 		Session.requestAnimationFrame( this.OnFrame.bind(this) );
-	}
-	
-	WaitForExit()
-	{
-		return this.WaitForExitPromise;
 	}
 	
 	//	I think here we can re-create layers if context dies,
@@ -505,6 +527,66 @@ class Pop_Xr_Device
 			return;
 		}
 		
+		//	named positions (ignoring other data atm)
+		const InputPositions = {};
+		const ReferenceSpace = this.ReferenceSpace;
+		const FrameInputs = Array.from(Frame.session.inputSources);
+		function PosFromSpace(Space)
+		{
+			let Pose = Frame.getPose(Space,ReferenceSpace);
+			Pose = Pose ? Pose.transform.position : {};
+			return [Pose.x,Pose.y,Pose.z,1];
+		}
+		
+		function UpdateInputNode(InputXrSpace,InputName,Buttons)
+		{
+			const Position = InputXrSpace ? PosFromSpace(InputXrSpace) : [0,0,0,0];
+			InputPositions[InputName] = Position;
+		}
+		
+		//	track which inputs we updated, so we can update old inputs that have gone missing
+		function UpdateInput(Input)
+		{
+			try
+			{
+				//	gr: this input name is not unique enough yet!
+				const InputName = Input.handedness;
+				
+				//	treat joints as individual inputs as they all have their own pos
+				if (Input.hand!==null)
+				{
+					//	enum all the joints
+					function EnumJoint(JointName)
+					{
+						const Key = XRHand[JointName];	//	XRHand.WRIST = int = key for .hand
+						const PoseSpace = Input.hand[Key];
+						const NodeName = `${InputName}_${JointName}`;
+						const Buttons = [];	//	skipping "button" code for now
+						UpdateInputNode(PoseSpace,NodeName,Buttons);
+					}
+					const JointNames = Object.keys(XRHand);
+					JointNames.forEach(EnumJoint);
+				}
+				
+				//	normal controller
+				if ( Input.gamepad )
+				{
+					if (!Input.gamepad.connected)
+						return;
+					
+					const Buttons = Input.gamepad.buttons || [];
+					UpdateInputNode( Input.targetRaySpace, InputName, Buttons );
+				}
+			}
+			catch(e)
+			{
+				Pop.Warning(`Input error ${e}`);
+			}
+		}
+		FrameInputs.forEach(UpdateInput);
+		
+		
+		this.OnUpdate(InputPositions,TimeMs);
 		
 		const glLayer = this.Session.renderState.baseLayer;
 		const gl = this.RenderContext;
@@ -544,7 +626,7 @@ class Pop_Xr_Device
 			Camera.LocalToWorld = View.transform.matrix;
 			Camera.WorldToLocal = View.transform.inverse.matrix;
 			Camera.ProjectionMatrix = View.projectionMatrix;
-			Camera.ScreenToCameraTransform = Math.MatrixInverse4x4(View.projectionMatrix);
+			Camera.ScreenToCameraTransform = InvertMatrix4x4(View.projectionMatrix);
 			Camera.CameraToScreenTransform = View.projectionMatrix;
 			
 			BindRenderTarget();
@@ -605,6 +687,7 @@ class ScreenDevice_t
 	{
 		this.Camera = {};
 		this.OnRender = function(){};
+		this.OnUpdate = function(){};
 
 		let RenderCallback = function(Timestamp)
 		{
@@ -630,10 +713,15 @@ class ScreenDevice_t
 			gl.scissor( ...Viewport );
 		}
 		
-		this.Camera.Position = [0,0,0];
-		this.Camera.LocalToWorld = GetMatrixIdentity();
-		this.Camera.WorldToLocal = GetMatrixIdentity();
-		this.Camera.ProjectionMatrix = GetMatrixIdentity();
+		//	from webxr
+		const ProjectionMatrix = [0.9172856211662292, 0, 0, 0, 0, 0.8335369825363159, 0, 0, -0.1740722358226776, -0.10614097863435745, -1.0001999139785767, -1, 0, 0, -0.2000199854373932, 0];
+		const TransformMatrix = [0.9638781547546387, 0.049760766327381134, -0.2616539001464844, 0, -0.024722494184970856, 0.9948665499687195, 0.09812905639410019, 0, 0.2651937007904053, -0.08811571449041367, 0.9601603746414185, 0, -0.052230026572942734, 1.264850378036499, -0.05096454545855522, 1];
+
+		this.Camera.LocalToWorld = TransformMatrix;
+		this.Camera.WorldToLocal = InvertMatrix4x4(this.Camera.LocalToWorld);
+		this.Camera.ProjectionMatrix = ProjectionMatrix;
+		this.Camera.ScreenToCameraTransform = InvertMatrix4x4(ProjectionMatrix);
+		this.Camera.CameraToScreenTransform = ProjectionMatrix;
 
 		let RenderTarget = new RenderTarget_t(RenderContext);
 		BindRenderTarget();
@@ -660,6 +748,7 @@ export default async function Main(Canvas,StartButton)
 	
 	const ScreenDevice = new ScreenDevice_t(RenderContext);
 	ScreenDevice.OnRender = Render;
+	ScreenDevice.OnUpdate = Update;
 	
 	while(true)
 	{
@@ -667,8 +756,9 @@ export default async function Main(Canvas,StartButton)
 		{
 			const Device = await CreateWebxrDevice(RenderContext,OnWaitForCallback);
 			Device.OnRender = Render;
+			Device.OnUpdate = Update;
 			//	wait for device to die
-			await Device.WaitForExit();
+			await Device.WaitForExit;
 		}
 		catch(e)
 		{
