@@ -706,7 +706,7 @@ class ScreenDevice_t
 			
 			//	this w/h should be canvas's w/h and that should be in sync with the element's getBoundingClientRect
 			//	in pixels!
-			const Viewport = [0,0,100,100];
+			const Viewport = [0,0,1000,1000];
 			
 			gl.bindFramebuffer( gl.FRAMEBUFFER, FrameBuffer );
 			gl.viewport( ...Viewport );

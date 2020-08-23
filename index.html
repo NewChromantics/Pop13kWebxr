@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <body>
-<input id=StartXr type=button style="visibility:hidden" value=Start />
-<canvas id=Canvas />
+<input id=StartXr type=button style="z-index:99;visibility:hidden" value=Start />
+<canvas id=Canvas width=1000 height=1000 style="position:absolute;left:0;top:10vh;width:100vw;height:90vh"/>
 <script type=module>
 	import Main from './App.js';
 	Main(Canvas,StartXr);
