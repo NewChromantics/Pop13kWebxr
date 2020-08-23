@@ -312,22 +312,12 @@ void main()
 `;
 
 
-const FragDebugUvShader = `
-precision highp float;
-varying vec2 LocalUv;
-void main()
-{
-	gl_FragColor = vec4(LocalUv,0,1);
-}
-`;
-
 import FragRaySphereShader from './RayMarch.frag.glsl.js';
 
 const AssetCaches = {};
 const AssetFetchs = {};
 
 AssetFetchs['Quad'] = GetQuad;
-AssetFetchs['Debug'] = GetDebugShader;
 AssetFetchs['RaySphere'] = GetRaySphereShader;
 
 function GetAsset(Name,Context)
@@ -342,10 +332,6 @@ function GetQuad(RenderContext)
 	return new GeoQuad_t(RenderContext);
 }
 
-function GetDebugShader(RenderContext)
-{
-	return new Shader_t(RenderContext,QuadVertShader,FragDebugUvShader);
-}
 
 function GetRaySphereShader(RenderContext)
 {
@@ -453,7 +439,6 @@ function Render(RenderTarget,Camera)
 	//Uniforms.ScreenToCameraTransform = Camera.ProjectionMatrix;
 	Uniforms.CameraToWorldTransform = Camera.LocalToWorld;
 	
-	//RenderTarget.Draw('Quad','Debug',Uniforms);
 	RenderTarget.Draw('Quad','RaySphere',Uniforms);
 }
 
